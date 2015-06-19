@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<qualifiedTypeNameHistroy>
+<fullyQualifiedTypeName name="android.R.id"/>
+<fullyQualifiedTypeName name="android.util.Log"/>
+<fullyQualifiedTypeName name="com.example.phytosenseit.R.drawable"/>
+<fullyQualifiedTypeName name="org.opencv.core.Mat"/>
+<fullyQualifiedTypeName name="android.graphics.ColorMatrix"/>
+<fullyQualifiedTypeName name="android.graphics.ColorMatrixColorFilter"/>
+<fullyQualifiedTypeName name="android.graphics.Color"/>
+<fullyQualifiedTypeName name="android.view.View.OnClickListener"/>
+<fullyQualifiedTypeName name="android.content.Intent"/>
+<fullyQualifiedTypeName name="android.content.ContentValues"/>
+<fullyQualifiedTypeName name="android.provider.MediaStore"/>
+<fullyQualifiedTypeName name="android.provider.MediaStore.Images.Media"/>
+<fullyQualifiedTypeName name="android.provider.MediaStore.Images"/>
+<fullyQualifiedTypeName name="org.opencv.android.CameraBridgeViewBase.CvCameraViewListener"/>
+<fullyQualifiedTypeName name="org.opencv.android.CameraBridgeViewBase"/>
+<fullyQualifiedTypeName name="android.view.View.OnTouchListener"/>
+<fullyQualifiedTypeName name="org.opencv.android.JavaCameraView"/>
+<fullyQualifiedTypeName name="org.opencv.android.LoaderCallbackInterface"/>
+<fullyQualifiedTypeName name="android.view.SurfaceView"/>
+<fullyQualifiedTypeName name="android.app.Activity"/>
+<fullyQualifiedTypeName name="android.widget.ImageView"/>
+<fullyQualifiedTypeName name="android.graphics.Bitmap"/>
+<fullyQualifiedTypeName name="android.graphics.Bitmap.Config"/>
+<fullyQualifiedTypeName name="org.opencv.android.Utils"/>
+<fullyQualifiedTypeName name="org.opencv.core.CvType"/>
+<fullyQualifiedTypeName name="org.opencv.core.Scalar"/>
+<fullyQualifiedTypeName name="org.opencv.imgproc.Imgproc"/>
+<fullyQualifiedTypeName name="android.graphics.BitmapFactory"/>
+<fullyQualifiedTypeName name="android.widget.Button"/>
+<fullyQualifiedTypeName name="org.opencv.samples.tutorial3.R.id"/>
+<fullyQualifiedTypeName name="org.opencv.imgcodecs.Imgcodecs"/>
+<fullyQualifiedTypeName name="com.example.phytosenseit.R.id"/>
+<fullyQualifiedTypeName name="org.opencv.samples.phytosenseit.R"/>
+<fullyQualifiedTypeName name="android.R"/>
+<fullyQualifiedTypeName name="android.R.drawable"/>
+</qualifiedTypeNameHistroy>

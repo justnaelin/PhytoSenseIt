@@ -1,0 +1,181 @@
+package com.example.testopencv;
+
+
+import android.R;
+import android.app.Activity;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory; 
+import android.os.Bundle;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.SurfaceView;
+
+ 
+
+import org.opencv.android.CameraBridgeViewBase.CvCameraViewFrame;
+import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
+import org.opencv.android.LoaderCallbackInterface; 
+import org.opencv.android.OpenCVLoader;
+import org.opencv.android.Utils;
+import org.opencv.core.CvType; 
+import org.opencv.core.Mat;
+import org.opencv.imgproc.Imgproc;
+
+import android.widget.ImageView; 
+import android.util.Log;
+
+
+// Camera Imports
+// Handler Object to interface camera peripheral  (Specific to Open CV)
+import org.opencv.android.JavaCameraView;
+//Helper function for binding the OpenCV service to Activity 
+import org.opencv.android.BaseLoaderCallback;
+
+public class MainActivity extends Activity implements CvCameraViewListener2  {
+	// Camera Related
+	private BaseLoaderCallback mLoaderCallbackOCV = new BaseLoaderCallback(this){
+		@Override
+		public void onManagerConnected(int status){
+			switch(status){
+			case LoaderCallbackInterface.SUCCESS:
+			{
+				Log.i(TAG, "OpenCV loaded successfully");
+				mOpenCvCameraView.enableView();
+				break;
+			}
+			default:
+			{
+				super.onManagerConnected(status);
+			}break;
+			}
+		}
+		
+	};
+	private JavaCameraView mOpenCvCameraView;
+
+	
+	private static final String TAG = "BinTest: ";
+	private Mat img;// matrix that will hold image
+	private ImageView imgV;
+	private static final int THRESHOLD = 100;
+	private static final int BLACK = 255;
+	private static final int WHITE = 0; // final is same as const
+	private BaseLoaderCallback mLoaderCallback = new
+			BaseLoaderCallback(this) { 
+		@Override
+		public void onManagerConnected(int status) { 
+			switch (status) {
+			case LoaderCallbackInterface.SUCCESS:
+			{
+				Log.i(TAG, "OpenCV loaded successfully");
+				//Method needed to initialize OpenCV items or camera. I am doing processing here
+				Bitmap imgBMap = BitmapFactory.decodeResource(getResources(), R.drawable.potato_commonScab_25);
+				// create the memory for the matrix
+				img = new Mat(imgBMap.getHeight(), imgBMap.getWidth(), CvType.CV_8U);
+
+				Utils.bitmapToMat(imgBMap, img); 
+				Imgproc.cvtColor(img, img, Imgproc.COLOR_RGB2GRAY); // Apply threshold so that lighter pixels are colored black
+				/*for(int i = 0; i < img.height(); i++) {
+					for(int j = 0; j < img.width(); j++) {
+						if(img.get(i, j)[0] < THRESHOLD)//get returns double[] to accommodate for RGB as an example
+							//bitmap
+							//	binary image
+						{
+							img.put(i, j, BLACK);//black
+						}
+						else{
+							// darker pixels are set to white
+							img.put(i,j, WHITE); // white
+						} 
+					}
+				}*/
+				Utils.matToBitmap(img, imgBMap);// convert matrix to
+				imgV.setImageBitmap(imgBMap);// set image view to
+			} break; 
+			default:
+			{
+				super.onManagerConnected(status);
+				Log.i(TAG, "OpenCV NOT Loaded");
+			} break; 
+			}
+		}
+	};
+
+	@Override
+	protected void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState); 
+		setContentView(R.layout.activity_main);
+		imgV = (ImageView)findViewById(R.id.imageView1);
+		
+		// Camera Related
+		mOpenCvCameraView = (JavaCameraView) findViewById(R.id.MainActivityCameraView);
+		mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
+		mOpenCvCameraView.setCvCameraViewListener(this);
+	}
+	@Override
+	public void onResume() {
+		// Method always called after returning from pause state // or when activity is first created and everytime
+		// the activity comes into the foreground
+		super.onResume();
+		if (!OpenCVLoader.initDebug()) {
+			Log.d(TAG, "Internal OpenCV library not found. Using OpenCV Manager for initialization");
+			//This is where OpenCV is loaded and the callback is called
+			OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_0_0, this,mLoaderCallback);
+		} 
+		else{
+			Log.d(TAG, "OpenCV library found inside package. Running it!");
+			mLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
+		}
+		
+		//Camera Related
+		// The activity must connect to openCV service 
+		OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_0_0, this, mLoaderCallbackOCV);
+		
+	}
+	// Will disable to camera once the app 
+	// is finished 
+	public void onDestroy()
+	{
+		super.onDestroy();
+		if(mOpenCvCameraView != null){
+			mOpenCvCameraView.disableView();
+		}
+		
+	}
+	//present.
+
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+		// Inflate the menu; this adds items to the action bar if it is
+		getMenuInflater().inflate(R.menu.main, menu); 
+		return true;
+	}
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+		// Handle action bar item clicks here. The action bar will
+		// automatically handle clicks on the Home/Up button, so long // as you specify a parent activity in AndroidManifest.xml.
+		int id = item.getItemId();
+		if (id == R.id.action_settings) {
+			return true;
+		}
+		return super.onOptionsItemSelected(item);
+	}
+	@Override
+	public void onCameraViewStarted(int width, int height) {
+		// TODO Auto-generated method stub
+		
+	}
+	@Override
+	public void onCameraViewStopped() {
+		// TODO Auto-generated method stub
+		
+	}
+	@Override
+	public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
+		// TODO Auto-generated method stub
+		return inputFrame.rgba();
+	}
+	
+}
+
+

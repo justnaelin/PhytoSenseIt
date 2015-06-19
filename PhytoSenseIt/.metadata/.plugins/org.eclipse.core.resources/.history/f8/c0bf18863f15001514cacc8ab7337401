@@ -1,0 +1,172 @@
+package com.example.phytosenseit;
+
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.CameraBridgeViewBase.CvCameraViewFrame;
+import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
+import org.opencv.android.JavaCameraView;
+import org.opencv.android.LoaderCallbackInterface;
+import org.opencv.android.OpenCVLoader;
+import org.opencv.core.Mat;
+
+import android.support.v7.app.AppCompatActivity;
+import android.app.Activity;
+import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
+import android.os.Bundle;
+import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.SurfaceView;
+import android.widget.ImageView;
+
+public class MainActivity extends Activity implements CvCameraViewListener2 {
+    
+    protected static final String TAG = "PhytoSenseIt::MainActivity";
+
+    private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
+	@Override
+	public void onManagerConnected(int status) {
+	    switch(status) {
+	    case LoaderCallbackInterface.SUCCESS:
+	    {
+		Log.i(TAG, "OpenCV Loaded successfully");
+		mOpenCvCameraView.enableView();
+		break;
+	    }
+	    default:
+	    {
+		super.onManagerConnected(status);
+	    }
+	    }
+	}
+    };
+    
+    private JavaCameraView mOpenCvCameraView;
+   
+    
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+	super.onCreate(savedInstanceState);
+	
+	mOpenCvCameraView = (JavaCameraView) findViewById(R.id.camera_view);
+	mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
+	mOpenCvCameraView.setCvCameraViewListener(this);
+	/*
+	mCameraButton = (Button) findViewById(R.id.camera_button);
+	mCameraButton.setOnClickListener(new View.OnClickListener() {
+	    
+	    @Override
+	    public void onClick(View v) {
+		// TODO Auto-generated method stub
+		Log.d("onCreate", "Camera Button Clicked!");
+
+	    }
+	});
+	
+	mButton = (Button) findViewById(R.id.button1);
+	mButton.setOnClickListener(new View.OnClickListener() {
+	    @Override
+	    public void onClick(View v) {
+		Log.d("onCreate", "Binary Button Clicked!");
+		
+		convertToGrayscale(mImageView);
+		
+		//Convert ImageView to Bitmap image
+		mImageView.buildDrawingCache();
+		Bitmap bitmapImage = mImageView.getDrawingCache();
+		
+		bitmapImage = convertToBinaryImage(bitmapImage);
+		
+		// Set ImageView to Bitmap Image
+		//mImageView = (ImageView) findViewById(R.id.imageView1);
+		//mImageView.setImageBitmap(bitmapImage);
+		
+	    }
+	});
+	*/
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+	// Inflate the menu; this adds items to the action bar if it is present.
+	getMenuInflater().inflate(R.menu.main, menu);
+	return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+	// Handle action bar item clicks here. The action bar will
+	// automatically handle clicks on the Home/Up button, so long
+	// as you specify a parent activity in AndroidManifest.xml.
+	int id = item.getItemId();
+	if (id == R.id.action_settings) {
+	    return true;
+	}
+	return super.onOptionsItemSelected(item);
+    }
+
+    public void convertToGrayscale(ImageView img) {
+	Log.d("grayscale", "Grayscale Method Called!");
+	ColorMatrix matrix = new ColorMatrix();
+	matrix.setSaturation(0);
+
+	ColorMatrixColorFilter filter = new ColorMatrixColorFilter(matrix);
+	img.setColorFilter(filter);
+    }
+
+    public Bitmap convertToBinaryImage(Bitmap bmp) {
+	Log.d("convertToBinaryImage", "Converted to Binary Image!");
+	
+	int width, height, threshold;
+	height = bmp.getHeight();
+	width = bmp.getWidth();
+	threshold = 50;
+	
+	for(int i = 0; i < width; i++) {
+	    for(int j = 0; j < height; j++) {
+		int pixel = bmp.getPixel(i, j);
+		int red = Color.red(pixel);
+
+		if(red < threshold) {
+		    bmp.setPixel(i, j, 0xFF000000);
+		}
+		else {
+		    bmp.setPixel(i, j, 0xFFFFFFFF);
+		}
+	    }
+	}
+	return bmp;
+    }
+    @Override
+    public void onResume() {
+	super.onResume();
+	OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_0_0, this, mLoaderCallback);
+    }
+    @Override
+    public void onDestroy() {
+	super.onDestroy();
+	if(mOpenCvCameraView != null) {
+	    mOpenCvCameraView.disableView();
+	}
+    }
+    @Override
+    public void onCameraViewStarted(int width, int height) {
+	// TODO Auto-generated method stub
+	
+    }
+
+    @Override
+    public void onCameraViewStopped() {
+	// TODO Auto-generated method stub
+	
+    }
+
+    @Override
+    public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
+	return inputFrame.rgba();
+    }
+
+
+}
