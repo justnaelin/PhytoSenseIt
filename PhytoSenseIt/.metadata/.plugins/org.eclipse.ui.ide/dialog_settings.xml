@@ -14,11 +14,11 @@
 		<item value="false" key="WizardProjectsImportPage.STORE_COPY_PROJECT_ID"/>
 		<item value="false" key="WizardProjectsImportPage.STORE_ARCHIVE_SELECTED"/>
 		<list key="WizardProjectsImportPage.STORE_DIRECTORIES">
+			<item value="/Users/naelinaquino/Projects/PhytoSenseIt/PhytoSenseIt/OpenCV4Android"/>
 			<item value="/Users/naelinaquino/Downloads/OpenCV-android-sdk 2"/>
 			<item value="/Users/naelinaquino/Documents/Projects/Eclipse/TestOpenCV"/>
 			<item value="/Users/naelinaquino/Documents/Projects/Eclipse/tutorial-3-cameracontrol"/>
 			<item value="/Users/naelinaquino/Development/OpenCV-android-sdk/samples/tutorial-3-cameracontrol"/>
-			<item value="/Users/naelinaquino/Downloads/OpenCV-android-sdk/samples/tutorial-3-cameracontrol"/>
 		</list>
 		<list key="WizardProjectsImportPage.STORE_ARCHIVES">
 			<item value=""/>

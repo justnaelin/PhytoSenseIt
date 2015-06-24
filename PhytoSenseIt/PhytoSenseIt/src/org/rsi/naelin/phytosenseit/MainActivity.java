@@ -1,5 +1,6 @@
 package org.rsi.naelin.phytosenseit;
 
+import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -10,8 +11,11 @@ import org.opencv.android.CameraBridgeViewBase.CvCameraViewFrame;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
+import org.opencv.core.Core;
+import org.opencv.core.Core.MinMaxLocResult;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.Point;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
@@ -59,6 +63,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, OnT
                 {
                     Log.i(TAG, "OpenCV loaded successfully");
                     mOpenCvCameraView.enableView();
+                    //mOpenCvCameraView.setRotation(90);
                     mOpenCvCameraView.setOnTouchListener(MainActivity.this);
                 } break;
                 default:
@@ -93,19 +98,12 @@ public class MainActivity extends Activity implements CvCameraViewListener2, OnT
 	    
 	    @Override
 	    public void onClick(View v) {
-		/*
-	        Log.i(TAG,"onTouch event");
-	        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
-	        String currentDateandTime = sdf.format(new Date());
-	        mPhotoFilename = Environment.getExternalStorageDirectory().getPath() +
-                        "/sample_picture_" + currentDateandTime + ".jpg";
-	        mOpenCvCameraView.takePicture(mPhotoFilename);
-	        Log.d("onClick", mPhotoFilename);
-	        */
-	        // Close camera
-	        mOpenCvCameraView.setVisibility(SurfaceView.GONE);
+	       
+	        // Apply binary image
+	        // imageProcessing();
 	        
-	        imageProcessing();
+	        // Apply template matching
+	        templateMatching();
 	    }
 	});
         
@@ -220,7 +218,7 @@ public class MainActivity extends Activity implements CvCameraViewListener2, OnT
     public void imageProcessing() {	
         Mat imgMat = Imgcodecs.imread(mPhotoFilename, Imgcodecs.CV_LOAD_IMAGE_GRAYSCALE);
 
-        Imgproc.threshold(imgMat,imgMat,127,255,Imgproc.THRESH_OTSU);
+        Imgproc.threshold(imgMat,imgMat,127,255,Imgproc.THRESH_BINARY | Imgproc.THRESH_OTSU);
         Imgcodecs.imwrite(mPhotoFilename, imgMat);
         
         // Convert mat to bmp
@@ -235,5 +233,86 @@ public class MainActivity extends Activity implements CvCameraViewListener2, OnT
         // Display bmp in image view
         mBinaryImageView = (ImageView) findViewById(R.id.binary_image);
         mBinaryImageView.setImageBitmap(imgBmp);
+    }
+    
+    public void templateMatching() {
+	Point matchLoc;
+
+	// Load photo taken from camera app
+	Mat imgMat = Imgcodecs.imread(mPhotoFilename, Imgcodecs.CV_LOAD_IMAGE_GRAYSCALE);
+	
+	/* Load test photo from drawable as a bitmap
+        InputStream is = this.getResources().openRawResource(R.drawable.potato_commonscab_23);
+        Bitmap imgBmp = BitmapFactory.decodeStream(is);
+        Log.d("templateMatching", "Loaded test image from drawable");
+        */
+        
+	// Read template image from drawable as a bitmap
+        InputStream is = this.getResources().openRawResource(R.drawable.potato_commonscab_templ);
+        Bitmap templBmp = BitmapFactory.decodeStream(is);
+        Log.d("templateMatching", "Loaded template image from drawable");
+        
+        /*
+        // Create new mat object for test image
+        Mat imgMat = new Mat();
+        Log.d("templateMatching", "Created mat object for test");
+        */
+        
+        // Create new mat object for template
+        Mat templMat = new Mat();
+        Log.d("templateMatching", "Created mat object for template");
+        
+        // Create new mat object for result after applying template matching
+        Mat resultMat = new Mat();
+
+        /*
+        // Convert bitmap test image to OpenCV mat 
+        Utils.bitmapToMat(imgBmp, imgMat);
+        Log.d("templateMatching", "Converted test bitmap to OpenCV mat");
+	*/
+
+        // Convert bitmap template to OpenCV mat 
+        Utils.bitmapToMat(templBmp, templMat);
+        Log.d("templateMatching", "Converted template bitmap to OpenCV mat");
+        Log.d("Test Image Height", Integer.toString(templMat.rows()));
+        Log.d("Test Image Width", Integer.toString(templMat.cols()));
+        
+        /*
+        // Convert mat test image to gray
+        Imgproc.cvtColor(imgMat, imgMat, Imgproc.COLOR_RGB2GRAY);
+        Log.d("templateMatching", "Applied grayscale to test image");
+        */
+        
+        // Convert mat template to gray
+        Imgproc.cvtColor(templMat, templMat, Imgproc.COLOR_RGB2GRAY);
+        Log.d("templateMatching", "Applied grayscale to template image");
+
+        // Apply template to mat image
+	Imgproc.matchTemplate(imgMat, templMat, resultMat, Imgproc.TM_SQDIFF);
+        Log.d("templateMatching", "Applied template matching");
+	
+        // Get min/max locations
+        MinMaxLocResult mmr =  Core.minMaxLoc(resultMat);
+        matchLoc = mmr.minLoc;
+        Log.d("minMaxLoc", Double.toString(mmr.minVal));
+        
+        // Draw a rectangle around the match
+        Imgproc.rectangle(imgMat, matchLoc, new Point(matchLoc.x + templMat.cols(),
+                matchLoc.y + templMat.rows()), new Scalar(255,255,255));
+       
+        // Save 
+        Imgcodecs.imwrite(mPhotoFilename, imgMat);
+        
+        // Convert final mat image to bitmap
+        Bitmap imgBmpResult = Bitmap.createBitmap(imgMat.cols(), imgMat.rows(), Bitmap.Config.ARGB_8888);
+        Utils.matToBitmap(imgMat, imgBmpResult);
+        
+        // Close camera view
+        mOpenCvCameraView.setVisibility(SurfaceView.GONE);
+        
+        // Display bmp in image view
+        mBinaryImageView = (ImageView) findViewById(R.id.binary_image);
+        mBinaryImageView.setImageBitmap(imgBmpResult);
+
     }
 }
