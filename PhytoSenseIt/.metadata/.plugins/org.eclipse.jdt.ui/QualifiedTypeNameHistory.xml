@@ -29,16 +29,16 @@
 <fullyQualifiedTypeName name="android.graphics.BitmapFactory"/>
 <fullyQualifiedTypeName name="android.widget.Button"/>
 <fullyQualifiedTypeName name="org.opencv.samples.tutorial3.R.id"/>
-<fullyQualifiedTypeName name="org.opencv.imgcodecs.Imgcodecs"/>
 <fullyQualifiedTypeName name="com.example.phytosenseit.R.id"/>
 <fullyQualifiedTypeName name="org.opencv.samples.phytosenseit.R"/>
 <fullyQualifiedTypeName name="android.R"/>
 <fullyQualifiedTypeName name="android.R.drawable"/>
 <fullyQualifiedTypeName name="org.rsi.naelin.phytosenseit.R.drawable"/>
 <fullyQualifiedTypeName name="java.io.InputStream"/>
-<fullyQualifiedTypeName name="org.opencv.imgproc.Imgproc"/>
 <fullyQualifiedTypeName name="android.graphics.Point"/>
-<fullyQualifiedTypeName name="org.opencv.core.Core"/>
 <fullyQualifiedTypeName name="org.opencv.core.Core.MinMaxLocResult"/>
 <fullyQualifiedTypeName name="org.opencv.core.Point"/>
+<fullyQualifiedTypeName name="org.opencv.core.Core"/>
+<fullyQualifiedTypeName name="org.opencv.imgproc.Imgproc"/>
+<fullyQualifiedTypeName name="org.opencv.imgcodecs.Imgcodecs"/>
 </qualifiedTypeNameHistroy>
