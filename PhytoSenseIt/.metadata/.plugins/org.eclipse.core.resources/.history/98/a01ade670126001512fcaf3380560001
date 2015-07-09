@@ -24,7 +24,6 @@ import org.opencv.imgcodecs.*;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
@@ -108,7 +107,41 @@ public class MainActivity extends Activity implements CvCameraViewListener2, OnT
 	    
 	    @Override
 	    public void onClick(View v) {
-		run();
+		// Read template image from drawable as a bitmap
+	        InputStream cs_templ = getResources().openRawResource(R.drawable.potato_commonscab_templ_1);
+	        mTemplBmp = BitmapFactory.decodeStream(cs_templ);
+		imageAcquisition();
+		Log.d("onClick", "Round 1");
+		
+	        InputStream bs_templ = getResources().openRawResource(R.drawable.potato_blackscurf_templ_1);
+	        mTemplBmp = BitmapFactory.decodeStream(bs_templ);
+	        imageAcquisition();
+		Log.d("onClick", "Round 2");
+
+	        InputStream ss_templ = getResources().openRawResource(R.drawable.potato_silverscurf_templ_1);
+	        mTemplBmp = BitmapFactory.decodeStream(ss_templ);
+	        imageAcquisition();
+		Log.d("onClick", "Round 3");
+
+	        
+	        int index = determinePossibleDisease(); 
+	        if(index == 0) {
+	            cs_templ = getResources().openRawResource(R.drawable.potato_commonscab_templ_1);
+		    mTemplBmp = BitmapFactory.decodeStream(cs_templ);
+		    Utils.bitmapToMat(mTemplBmp, mTemplMat);
+	        }
+	        else if(index == 1) {
+		    bs_templ = getResources().openRawResource(R.drawable.potato_blackscurf_templ_1);
+		    mTemplBmp = BitmapFactory.decodeStream(bs_templ);
+		    Utils.bitmapToMat(mTemplBmp, mTemplMat);
+	        }
+	        else {
+		    bs_templ = getResources().openRawResource(R.drawable.potato_silverscurf_templ_1);
+		    mTemplBmp = BitmapFactory.decodeStream(bs_templ);
+		    Utils.bitmapToMat(mTemplBmp, mTemplMat);
+	        }
+	        
+	        displayResult(index);
 	    }
 	});
     }
@@ -302,15 +335,8 @@ public class MainActivity extends Activity implements CvCameraViewListener2, OnT
     }
     
     void imageAcquisition() {
-	Context c = getApplicationContext();
-	
-	String diseaseName = "potato_blackscurf_";
-	int imgNum = 0;
-	int idName = c.getResources().getIdentifier((diseaseName+imgNum), "drawable", c.getPackageName());		
-	Bitmap mImgBmp = BitmapFactory.decodeResource(getResources(), idName);
-	
 	//Load test photo from drawable as a bitmap
-        InputStream is = this.getResources().openRawResource(R.drawable.potato_blackscurf_15);
+        InputStream is = this.getResources().openRawResource(R.drawable.potato_commonscab_0);
         mImgBmp = BitmapFactory.decodeStream(is);
         Log.d("imageAcquisition", "Loaded test image from drawable");
      
@@ -384,57 +410,6 @@ public class MainActivity extends Activity implements CvCameraViewListener2, OnT
 	    }
 	}
 	return maxIndexSoFar;
-    }
-    
-    void run() {
-	Context c = getApplicationContext();
-	
-	// Loop through templates
-	// Run through black scurf templates
-	String templName = "potato_blackscurf_templ_";
-	int imgNum = 1;
-	while(imgNum < 4) {
-	    int idName = c.getResources().getIdentifier((templName + imgNum), "drawable", c.getPackageName());
-	    mTemplBmp = BitmapFactory.decodeResource(getResources(), idName);
-	    imageAcquisition();
-	}
-	// Run through common scab templates
-	templName = "potato_commonscab_templ_";
-	imgNum = 1;
-	while(imgNum < 4) {
-	    int idName = c.getResources().getIdentifier((templName + imgNum), "drawable", c.getPackageName());
-	    mTemplBmp = BitmapFactory.decodeResource(getResources(), idName);
-	    imageAcquisition();
-	}
-	// Run through silver scurf templates
-	templName = "potato_silverscurf_templ_";
-	imgNum = 1;
-	while(imgNum < 4) {
-	    int idName = c.getResources().getIdentifier((templName + imgNum), "drawable", c.getPackageName());
-	    mTemplBmp = BitmapFactory.decodeResource(getResources(), idName);
-	    imageAcquisition();
-	}
-	
-        int index = determinePossibleDisease(); 
-        /*
-        if(index == 0) {
-            cs_templ = getResources().openRawResource(R.drawable.potato_commonscab_templ_1);
-	    mTemplBmp = BitmapFactory.decodeStream(cs_templ);
-	    Utils.bitmapToMat(mTemplBmp, mTemplMat);
-        }
-        else if(index == 1) {
-	    bs_templ = getResources().openRawResource(R.drawable.potato_blackscurf_templ_1);
-	    mTemplBmp = BitmapFactory.decodeStream(bs_templ);
-	    Utils.bitmapToMat(mTemplBmp, mTemplMat);
-        }
-        else {
-	    bs_templ = getResources().openRawResource(R.drawable.potato_silverscurf_templ_1);
-	    mTemplBmp = BitmapFactory.decodeStream(bs_templ);
-	    Utils.bitmapToMat(mTemplBmp, mTemplMat);
-        }
-        
-        displayResult(index);
-        */
     }
 
 }
