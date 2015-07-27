@@ -1,5 +1,4 @@
 INDEX VERSION 1.127+/Users/naelinaquino/Projects/PhytoSenseIt/PhytoSenseIt/.metadata/.plugins/org.eclipse.jdt.core
-1270315800.index
 2266394401.index
 3324179395.index
 2732638570.index

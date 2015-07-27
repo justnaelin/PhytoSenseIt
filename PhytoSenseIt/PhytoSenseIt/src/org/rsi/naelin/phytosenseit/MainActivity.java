@@ -1,6 +1,10 @@
 package org.rsi.naelin.phytosenseit;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -16,19 +20,23 @@ import org.opencv.core.Core;
 import org.opencv.core.Core.MinMaxLocResult;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfRect;
 import org.opencv.core.Point;
+import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
 import org.opencv.imgcodecs.*;
+import org.opencv.objdetect.CascadeClassifier;
+import org.opencv.core.Size;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
+import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
-import android.hardware.Camera.Size;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
@@ -44,11 +52,15 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Toast;
 
-public class MainActivity extends Activity implements CvCameraViewListener2, OnTouchListener {
-    private static final String TAG = "PhytoSenseIt::Activity";
+public class MainActivity extends Activity implements CvCameraViewListener2,
+	OnTouchListener {
+    //private static final String TAG = "PhytoSenseIt::Activity";
+    private static String mImageNameTag = "";
+    private static int mTemplNumTag = -1;
+    private static String mTemplNameTag = "";
 
     private CameraView mOpenCvCameraView;
-    private List<Size> mResolutionList;
+    private List<android.hardware.Camera.Size> mResolutionList;
     private MenuItem[] mEffectMenuItems;
     private SubMenu mColorEffectsMenu;
     private MenuItem[] mResolutionMenuItems;
@@ -59,85 +71,172 @@ public class MainActivity extends Activity implements CvCameraViewListener2, OnT
     private Mat mImgMat;
     private Mat mTemplMat;
     private Mat mResultMat;
+    private Mat mImgMatSat;
+    private Mat mTemplMatSat;
+    private Mat mImgMatBin;
+    private Mat mTemplMatBin;
+    private Mat mImgMatGray;
+    private Mat mTemplMatGray;
     private Bitmap mImgBmp;
     private Bitmap mTemplBmp;
     private Bitmap mResultBmp;
-    private double[] mMaxValues = new double[3];
+    private double[] mMaxValues = new double[8];
     private int x = 0;
-    private Point[] mMaxLoc = new Point[3];
+    private Point[] mMaxLoc = new Point[8];
     
+    // Cascade classifier
+    private static final String TAG = "BinTest";
+    private Mat img; // matric that will hold image
+    private ImageView imgV;
+    CascadeClassifier greyCas; // cascade classifier variable
+    String cas_grey_fname; 
+    // For logging purposes
+    private static String classifierTAG = "Cascade Class";
+
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
-        @Override
-        public void onManagerConnected(int status) {
-            switch (status) {
-                case LoaderCallbackInterface.SUCCESS:
-                {
-                    Log.i(TAG, "OpenCV loaded successfully");
-                    mOpenCvCameraView.enableView();
-                    //mOpenCvCameraView.setRotation(90);
-                    mOpenCvCameraView.setOnTouchListener(MainActivity.this);
-                } break;
-                default:
-                {
-                    super.onManagerConnected(status);
-                } break;
-            }
-        }
+	@Override
+	public void onManagerConnected(int status) {
+	    switch (status) {
+	    case LoaderCallbackInterface.SUCCESS: {
+		Log.i(TAG, "OpenCV loaded successfully");
+		
+		// ========== Cascade Classifier start =================
+	        // Create bitmap of image to run classifier on
+                Bitmap imgBMap = BitmapFactory.decodeResource(getResources(), R.drawable.potato_blackscurf_12);
+    		// create the memory for the matrix
+    		img = new Mat(imgBMap.getHeight(), imgBMap.getWidth(), CvType.CV_8U);
+    		// Convert bitmap to a matrix
+    		Utils.bitmapToMat(imgBMap, img);
+  
+    		// Create a new matrix for the image that will be resized
+    		Mat img2 = new Mat();
+		// Resize image to 100 by 100 - this might not be necessary
+    		Imgproc.resize(img, img2, new Size(100,100),0.0,0.0,Imgproc.INTER_LINEAR);
+    		// Make sure image is in grayscale
+    		Imgproc.cvtColor(img2, img2, Imgproc.COLOR_RGB2GRAY);
+
+    		// Get file name for classifier
+    		AssetManager am = getAssets();
+    		InputStream inputS;
+		try {
+			// create local copy of file so we can open it with opencv
+			inputS = am.open("cascadebs.xml"); // filename of cascade classifier
+			Log.d(classifierTAG, "Opened asset");
+			cas_grey_fname = getAndCreateFileName(inputS);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    		
+    		// log file was created successfully
+    		Log.d(classifierTAG, "File Created: " + cas_grey_fname);
+    		// Create a new classifier object
+		greyCas = new CascadeClassifier();
+		// load file and check that load was successful
+    		if(!(greyCas.load(cas_grey_fname))){
+    			
+    			Log.d(classifierTAG, "ERROR: Could not load classifier");
+    		}
+    		Log.d(classifierTAG, "Classifier file loaded");
+    		// ======== Run classifier =====================
+    		MatOfRect rects = new MatOfRect();
+    		// equalize image - uncomment following line to run
+    		Imgproc.equalizeHist(img2, img2);
+    		Size s_start = new Size(5,5);
+    		Size s_stop = new Size(100, 100);
+		// run classifier on image
+    		greyCas.detectMultiScale(img2, rects, 1.01, 1,3, s_start, s_stop);
+    	
+    		Log.d(classifierTAG, "Completed detection");
+    		// Display result if any
+    		Rect arr[] = rects.toArray();
+    		Log.d(classifierTAG, "# Rects = " + arr.length);
+    		if(arr.length > 0){
+    			Imgproc.cvtColor(img2, img2, Imgproc.COLOR_GRAY2RGBA);
+    			Imgproc.rectangle(img2, new Point(arr[0].x, arr[0].y), 
+    				new Point(arr[0].width, arr[0].height), new Scalar(0,255,0));
+    		}
+
+    		Log.d(classifierTAG, "After draw rectangle");
+    		// Display resized image on android screen
+    		imgV = (ImageView) findViewById(R.id.image_view);
+    		Bitmap bmp = Bitmap.createBitmap(img2.cols(), img2.rows(), Bitmap.Config.ARGB_8888);
+    		Utils.matToBitmap(img2, bmp);//imgBMap);// convert matrix to bitmap
+    		imgV.setImageBitmap(bmp);//imgBMap);// set image view to binary image
+    		
+    		
+    		// ========== Cascade Classifier end ==========
+    		 
+    		 
+		
+    		// ========== Camera View ================
+		mOpenCvCameraView.enableView();
+		mOpenCvCameraView.setOnTouchListener(MainActivity.this);
+	    }
+		break;
+	    default: {
+		super.onManagerConnected(status);
+	    }
+		break;
+	    }
+	}
     };
 
     public MainActivity() {
-        Log.i(TAG, "Instantiated new " + this.getClass());
+	Log.i(TAG, "Instantiated new " + this.getClass());
     }
 
     /** Called when the activity is first created. */
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        Log.i(TAG, "called onCreate");
-        super.onCreate(savedInstanceState);
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+	Log.i(TAG, "called onCreate");
+	super.onCreate(savedInstanceState);
+	getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
-        // Set views
-        setContentView(R.layout.activity_main);  
-        mOpenCvCameraView = (CameraView) findViewById(R.id.java_surface_view);
-        mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
-        mOpenCvCameraView.setCvCameraViewListener(this);
+	// Set views
+	setContentView(R.layout.activity_main);
+	mOpenCvCameraView = (CameraView) findViewById(R.id.java_surface_view);
+	mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
+	mOpenCvCameraView.setCvCameraViewListener(this);
 
-        // Button for detection process    
-        mTakePhotoButton = (Button) findViewById(R.id.take_photo_button);
-        mTakePhotoButton.setOnClickListener(new View.OnClickListener() {
-	    
+	// Button for detection process
+	mTakePhotoButton = (Button) findViewById(R.id.take_photo_button);
+	mTakePhotoButton.setOnClickListener(new View.OnClickListener() {
+
 	    @Override
 	    public void onClick(View v) {
-		run();
+		// binaryThresholding();
+		mOpenCvCameraView.setVisibility(SurfaceView.GONE);
+		imageAcquisition();
 	    }
 	});
     }
 
     @Override
-    public void onPause()
-    {
-        super.onPause();
-        if (mOpenCvCameraView != null)
-            mOpenCvCameraView.disableView();
+    public void onPause() {
+	super.onPause();
+	if (mOpenCvCameraView != null)
+	    mOpenCvCameraView.disableView();
     }
 
     @Override
-    public void onResume()
-    {
-        super.onResume();
-        if (!OpenCVLoader.initDebug()) {
-            Log.d(TAG, "Internal OpenCV library not found. Using OpenCV Manager for initialization");
-            OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_0_0, this, mLoaderCallback);
-        } else {
-            Log.d(TAG, "OpenCV library found inside package. Using it!");
-            mLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
-        }
+    public void onResume() {
+	super.onResume();
+	if (!OpenCVLoader.initDebug()) {
+	    Log.d(TAG,
+		    "Internal OpenCV library not found. Using OpenCV Manager for initialization");
+	    OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_0_0, this,
+		    mLoaderCallback);
+	} else {
+	    Log.d(TAG, "OpenCV library found inside package. Using it!");
+	    mLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
+	}
     }
 
     public void onDestroy() {
-        super.onDestroy();
-        if (mOpenCvCameraView != null)
-            mOpenCvCameraView.disableView();
+	super.onDestroy();
+	if (mOpenCvCameraView != null)
+	    mOpenCvCameraView.disableView();
     }
 
     public void onCameraViewStarted(int width, int height) {
@@ -147,294 +246,455 @@ public class MainActivity extends Activity implements CvCameraViewListener2, OnT
     }
 
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
-        return inputFrame.rgba();
+	return inputFrame.rgba();
     }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        List<String> effects = mOpenCvCameraView.getEffectList();
+	List<String> effects = mOpenCvCameraView.getEffectList();
 
-        if (effects == null) {
-            Log.e(TAG, "Color effects are not supported by device!");
-            return true;
-        }
+	if (effects == null) {
+	    Log.e(TAG, "Color effects are not supported by device!");
+	    return true;
+	}
 
-        mColorEffectsMenu = menu.addSubMenu("Color Effect");
-        mEffectMenuItems = new MenuItem[effects.size()];
+	mColorEffectsMenu = menu.addSubMenu("Color Effect");
+	mEffectMenuItems = new MenuItem[effects.size()];
 
-        int idx = 0;
-        ListIterator<String> effectItr = effects.listIterator();
-        while(effectItr.hasNext()) {
-           String element = effectItr.next();
-           mEffectMenuItems[idx] = mColorEffectsMenu.add(1, idx, Menu.NONE, element);
-           idx++;
-        }
+	int idx = 0;
+	ListIterator<String> effectItr = effects.listIterator();
+	while (effectItr.hasNext()) {
+	    String element = effectItr.next();
+	    mEffectMenuItems[idx] = mColorEffectsMenu.add(1, idx, Menu.NONE,
+		    element);
+	    idx++;
+	}
 
-        mResolutionMenu = menu.addSubMenu("Resolution");
-        mResolutionList = mOpenCvCameraView.getResolutionList();
-        mResolutionMenuItems = new MenuItem[mResolutionList.size()];
+	mResolutionMenu = menu.addSubMenu("Resolution");
+	mResolutionList = mOpenCvCameraView.getResolutionList();
+	mResolutionMenuItems = new MenuItem[mResolutionList.size()];
 
-        ListIterator<Size> resolutionItr = mResolutionList.listIterator();
-        idx = 0;
-        while(resolutionItr.hasNext()) {
-            Size element = resolutionItr.next();
-            mResolutionMenuItems[idx] = mResolutionMenu.add(2, idx, Menu.NONE,
-                    Integer.valueOf(element.width).toString() + "x" + Integer.valueOf(element.height).toString());
-            idx++;
-         }
+	ListIterator<android.hardware.Camera.Size> resolutionItr = mResolutionList.listIterator();
+	idx = 0;
+	while (resolutionItr.hasNext()) {
+	    android.hardware.Camera.Size element = resolutionItr.next();
+	    mResolutionMenuItems[idx] = mResolutionMenu.add(2, idx, Menu.NONE,
+		    Integer.valueOf(element.width).toString() + "x"
+			    + Integer.valueOf(element.height).toString());
+	    idx++;
+	}
 
-        return true;
+	return true;
     }
 
     public boolean onOptionsItemSelected(MenuItem item) {
-        Log.i(TAG, "called onOptionsItemSelected; selected item: " + item);
-        if (item.getGroupId() == 1)
-        {
-            mOpenCvCameraView.setEffect((String) item.getTitle());
-            Toast.makeText(this, mOpenCvCameraView.getEffect(), Toast.LENGTH_SHORT).show();
-        }
-        else if (item.getGroupId() == 2)
-        {
-            int id = item.getItemId();
-            Size resolution = mResolutionList.get(id);
-            mOpenCvCameraView.setResolution(resolution);
-            resolution = mOpenCvCameraView.getResolution();
-            String caption = Integer.valueOf(resolution.width).toString() + "x" + Integer.valueOf(resolution.height).toString();
-            Toast.makeText(this, caption, Toast.LENGTH_SHORT).show();
-        }
+	Log.i(TAG, "called onOptionsItemSelected; selected item: " + item);
+	if (item.getGroupId() == 1) {
+	    mOpenCvCameraView.setEffect((String) item.getTitle());
+	    Toast.makeText(this, mOpenCvCameraView.getEffect(),
+		    Toast.LENGTH_SHORT).show();
+	} else if (item.getGroupId() == 2) {
+	    int id = item.getItemId();
+	    android.hardware.Camera.Size resolution = mResolutionList.get(id);
+	    mOpenCvCameraView.setResolution(resolution);
+	    resolution = mOpenCvCameraView.getResolution();
+	    String caption = Integer.valueOf(resolution.width).toString() + "x"
+		    + Integer.valueOf(resolution.height).toString();
+	    Toast.makeText(this, caption, Toast.LENGTH_SHORT).show();
+	}
 
-        return true;
+	return true;
     }
 
     @SuppressLint("SimpleDateFormat")
     @Override
     public boolean onTouch(View v, MotionEvent event) {
-        Log.i(TAG,"onTouch event");
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
-        String currentDateandTime = sdf.format(new Date());
-        mPhotoFilename = Environment.getExternalStorageDirectory().getPath() +
-                               "/test_" + currentDateandTime + ".jpg";
-        mOpenCvCameraView.takePicture(mPhotoFilename);
-        Toast.makeText(this, mPhotoFilename + " saved", Toast.LENGTH_SHORT).show();
-        return false;
+	Log.i(TAG, "onTouch event");
+	SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");
+	String currentDateandTime = sdf.format(new Date());
+	mPhotoFilename = Environment.getExternalStorageDirectory().getPath()
+		+ "/test_" + currentDateandTime + ".jpg";
+	mOpenCvCameraView.takePicture(mPhotoFilename);
+	Toast.makeText(this, mPhotoFilename + " saved", Toast.LENGTH_SHORT)
+		.show();
+	return false;
+    }
+
+    private String getAndCreateFileName(InputStream is)
+    {
+    	try{
+    		File f = new File(getFilesDir()+"/cascade_greyF.xml");
+    		Log.d(classifierTAG, f.getAbsolutePath());
+    		OutputStream os = new FileOutputStream(f);
+    		byte buff[] = new byte[1024];
+    		int length = 0;
+    		while((length = is.read(buff)) > 0 ){
+    			os.write(buff, 0, length);
+    		}
+    		os.close();
+    		is.close();
+    		//Log.i(classifierTAG, f.getAbsolutePath());
+    		return f.getAbsolutePath();
+    	}catch(IOException e){
+    		Log.e(classifierTAG, "Could not write file");
+    	}
+    	return "";
     }
     
-    public void preProcessing() {	
-        //mImgMat = Imgcodecs.imread(mPhotoFilename, Imgcodecs.CV_LOAD_IMAGE_GRAYSCALE);
+    public void binaryThresholdingImg() {
+	// mImgMat = Imgcodecs.imread(mPhotoFilename,
+	// Imgcodecs.CV_LOAD_IMAGE_GRAYSCALE);
+
+	// Load/run black scurf test images against diseased templates
 
 	// Convert test image to binary
-        Imgproc.threshold(mImgMat,mImgMat,127,255,Imgproc.THRESH_BINARY | Imgproc.THRESH_OTSU);
-        // Convert template to binary
-        Imgproc.threshold(mTemplMat, mTemplMat, 127, 255, Imgproc.THRESH_BINARY | Imgproc.THRESH_OTSU);
-        //Imgcodecs.imwrite(mPhotoFilename, mImgMat);
-        /*
-        // Convert mat to bmp
-        Bitmap mImgBmp = Bitmap.createBitmap(mImgMat.cols(), mImgMat.rows(), Bitmap.Config.ARGB_8888);
-        Log.d("imageProcessing", "Created Bitmap");
-        Utils.matToBitmap(mImgMat, mImgBmp);
-        Log.d("imageProcessing", "Converted Mat to Bitmap");
-        
-        // Close camera view
-        mOpenCvCameraView.setVisibility(SurfaceView.GONE);
+	mImgMatBin = new Mat();
+	double threshVal = Imgproc.threshold(mImgMat, mImgMatBin, 127, 255,
+		Imgproc.THRESH_BINARY);
+	Log.d("binaryThresholdingImg", "Applied binary image");
+	// Convert template to binary
+	// | Imgproc.THRESH_OTSU.
+	// Imgcodecs.imwrite(mPhotoFilename, mImgMat);
+	// }
+	// Convert mat to bmp Bitmap mImgBmp =
+	// Bitmap.createBitmap(mImgMat.cols(), mImgMat.rows(),
+	// Bitmap.Config.ARGB_8888);
+	// Utils.matToBitmap(mImgMat, mImgBmp);
+	// Log.d("binaryThresholding", "bmp h=" + mImgBmp.getHeight() + " w=" +
+	// mImgBmp.getWidth());
+	// Close camera view
+	// mOpenCvCameraView.setVisibility(SurfaceView.GONE);
 
-        // Display bmp in image view
-        mBinaryImageView = (ImageView) findViewById(R.id.binary_image);
-        mBinaryImageView.setImageBitmap(mImgBmp);*/
-        templateMatching();
+	// Display bmp in image view mBinaryImageView = (ImageView)
+	// mBinaryImageView = (ImageView) findViewById(R.id.image_view);
+	// mBinaryImageView.setImageBitmap(mImgBmp);
+
+	// templateMatching();
     }
-    
-    public void templateMatching() {
+
+    public void binaryThresholdingTempl() {
+	mTemplMatBin = new Mat();
+	Imgproc.threshold(mTemplMat, mTemplMatBin, 127, 255,
+		Imgproc.THRESH_BINARY);
+	Log.d("binaryThresholdingTempl", "Applied binary image");
+    }
+
+    public void templateMatching(Mat imgMat, Mat templMat) {
 	/*
-	// Load photo taken from camera app
-	imgMat = Imgcodecs.imread(mPhotoFilename);
-	*/
-       
-        // Apply template to mat image
-	Imgproc.matchTemplate(mImgMat, mTemplMat, mResultMat, Imgproc.TM_CCOEFF_NORMED);
-        Log.d("templateMatching", "Applied template matching");
-        
-        MinMaxLocResult mmr =  Core.minMaxLoc(mResultMat);
-       
-        // Save max/location into respective arrays
-       // if(x == 1) // Running black scurf template
-         //   mMaxValues[x] = mmr.maxVal - .2; // Scaling down the max values to even out with other disease maximums
-        //else
-            mMaxValues[x] = mmr.maxVal;
-        Log.d("templateMatching", "Saved max into array");
-        mMaxLoc[x] = mmr.maxLoc;
-        Log.d("templateMatching", "Saved loc into array");
+	 * // Load photo taken from camera app imgMat =
+	 * Imgcodecs.imread(mPhotoFilename);
+	 */
+	Log.d("templateMatching", "Start");
+	// Apply template to mat image
+	Imgproc.matchTemplate(imgMat, templMat, mResultMat,
+		Imgproc.TM_CCOEFF_NORMED);
+	Log.d("templateMatching", "Applied template matching");
 
-        x++;  
-        
-        Log.d("templateMatching", "Saved values into arrays");
-        Log.d("templateMatching", "Max value: " + (mmr.maxVal));
-        
-        // Normalize
-        Core.normalize( mResultMat, mResultMat, 0, 1, Core.NORM_MINMAX, -1, new Mat());
-    }
-    
-    public void extractSaturationChannel() {	
-	Log.d("extractSaturationChannel", "Run");
-	 // Convert mat test image to HSV
-        Imgproc.cvtColor(mImgMat, mImgMat, Imgproc.COLOR_BGR2HSV);
-        Log.d("templateMatching", "Applied grayscale to test image");
-        
-        // Convert mat template to HSV
-        Imgproc.cvtColor(mTemplMat, mTemplMat, Imgproc.COLOR_BGR2HSV);
-        Log.d("templateMatching", "Applied grayscale to template image");
+	// Save max/location into respective arrays
+	MinMaxLocResult mmr = Core.minMaxLoc(mResultMat);
 	
-        // Split hue, saturation, and value
-        List<Mat> imgChannels = new ArrayList<Mat>();
-        List<Mat> templChannels = new ArrayList<Mat>();
-        for(int i = 0; i < mImgMat.channels(); i++) {
-            Mat channel = new Mat();
-            imgChannels.add(channel);
-            templChannels.add(channel);
-        }
-        Core.split(mImgMat, imgChannels);
-        Core.split(mTemplMat, templChannels);
-        
-        mImgMat = imgChannels.get(1); // Get saturation channel for image
-        mTemplMat = templChannels.get(1); // Get saturation channel for template  
-        
-        //preProcessing();
-        templateMatching();
+	// Normalize black scurf and common scab values
+	if(x >= 0 &&  x < 6)
+	    mMaxValues[x] = mmr.maxVal - 0.1;
+	else
+	    mMaxValues[x] = mmr.maxVal;
+	Log.d("templateMatching", "Saved max into array");
+	
+	Log.d("All maxes",
+		mImageNameTag + mTemplNameTag + Integer.toString(mTemplNumTag)
+			+ "=" + Double.toString(mMaxValues[x]));
+
+	x += 1;
+
+	// Normalize
+	Core.normalize(mResultMat, mResultMat, 0, 1, Core.NORM_MINMAX, -1,
+		new Mat());
+	Log.d("templateMatching", "Normalized");
     }
-    
-    void imageAcquisition() {
+
+    public void extractSaturationChannelImg() {
+	// Convert mat test image to HSV
+	mImgMatSat = new Mat();
+	Imgproc.cvtColor(mImgMat, mImgMatSat, Imgproc.COLOR_BGR2HSV);
+	Log.d("extractSaturationChannelImg", "Applied HSV to test image");
+	//convertToGrayscaleImg();
+
+	// Split hue, saturation, and value
+	List<Mat> imgChannels = new ArrayList<Mat>();
+	for (int i = 0; i < mImgMatSat.channels(); i++) {
+	    Mat channel = new Mat();
+	    imgChannels.add(channel);
+	}
+	Core.split(mImgMatSat, imgChannels);
+	mImgMatSat = imgChannels.get(1); // Get saturation channel for image
+    }
+
+    public void extractSaturationChannelTempl() {
+	// Convert mat template to HSV
+	mTemplMatSat = new Mat();
+	Imgproc.cvtColor(mTemplMat, mTemplMatSat, Imgproc.COLOR_BGR2HSV);
+	Log.d("extractSaturationChannelTempl", "Applied HSV to template image");
+	//convertToGrayscaleTempl();
+
+
+	List<Mat> templChannels = new ArrayList<Mat>();
+	for (int i = 0; i < mTemplMatSat.channels(); i++) {
+	    Mat channel = new Mat();
+	    templChannels.add(channel);
+	}
+	Core.split(mTemplMatSat, templChannels);
+	mTemplMatSat = templChannels.get(1); // Get saturation channel for
+					     // template
+	Log.d("extractSaturationChannelTempl", "Done");
+    }
+
+    public void imageAcquisition() { // FOR TESTING PURPOSES
+	Log.d("imageAcquisition", "Start");
 	Context c = getApplicationContext();
-	
+
+	// Load/run black scurf test images against diseased templates
 	String diseaseName = "potato_blackscurf_";
 	int imgNum = 0;
-	int idName = c.getResources().getIdentifier((diseaseName+imgNum), "drawable", c.getPackageName());		
-	Bitmap mImgBmp = BitmapFactory.decodeResource(getResources(), idName);
-	
-	//Load test photo from drawable as a bitmap
-        InputStream is = this.getResources().openRawResource(R.drawable.potato_blackscurf_15);
-        mImgBmp = BitmapFactory.decodeStream(is);
-        Log.d("imageAcquisition", "Loaded test image from drawable");
-     
-        // Create new mat object for image
-        mImgMat = new Mat();
-        Log.d("imageAcquisition", "Created mat object for test");
-        
-        // Create new mat object for template
-        mTemplMat = new Mat();
-        Log.d("imageAcquisition", "Created mat object for template");
-        
-        // Convert bitmap test image to OpenCV mat 
-        Utils.bitmapToMat(mImgBmp, mImgMat);
-        Log.d("imageAcquisition", "Converted test bitmap to OpenCV mat");        
-        
-        // Create new mat object for resultMat
-        int resultCols = mImgMat.cols() - mTemplMat.cols() + 1;
-        int resultRows = mImgMat.rows() - mTemplMat.rows() + 1;
-        mResultMat = new Mat(resultRows, resultCols, CvType.CV_32FC1);
-        
-        // Convert bitmap template to OpenCV mat 
-        Utils.bitmapToMat(mTemplBmp, mTemplMat);
-        Log.d("imageAcquisition", "Converted template bitmap to OpenCV mat");
-        
-        if(x == 2) // Last run: silver scurf test
-            extractSaturationChannel();
-        else {
-            convertToGrayscale();
-            templateMatching();
-        }
-    }
-    
-    void convertToGrayscale() {
-        Imgproc.cvtColor(mImgMat, mImgMat, Imgproc.COLOR_BGR2GRAY);
-        Imgproc.cvtColor(mTemplMat, mTemplMat, Imgproc.COLOR_BGR2GRAY);
-    }
-    
-    void displayResult(int index) {
+	mImageNameTag = "BS_";
+	while (imgNum < 18) {
+	    int idName = c.getResources().getIdentifier((diseaseName + imgNum),
+		    "drawable", c.getPackageName());
+	    mImgBmp = BitmapFactory.decodeResource(getResources(), idName);
+	    Log.d("imageAcquisition", diseaseName + Integer.toString(imgNum));
+	    setupMatObjectsImg();
+	    getTemplates();
+	    determinePossibleDisease();
+	    x = 0;
+	    imgNum += 1;
+	}
+	// Load/run common scab test images against diseased templates
+	diseaseName = "potato_commonscab_";
+	imgNum = 0;
+	mImageNameTag = "CS_";
+	while (imgNum < 18) {
+	    int idName = c.getResources().getIdentifier((diseaseName + imgNum),
+		    "drawable", c.getPackageName());
+	    mImgBmp = BitmapFactory.decodeResource(getResources(), idName);
+	    Log.d("imageAcquisition", diseaseName + Integer.toString(imgNum));
+	    setupMatObjectsImg();
+	    // convertToGrayscaleImg();
+	    getTemplates();
+	    determinePossibleDisease();
+	    x = 0;
+	    imgNum += 1;
 
-        // Draw a rectangle around the match
-        Imgproc.rectangle(mImgMat, mMaxLoc[index], new Point(mMaxLoc[index].x + mTemplMat.cols(),
-                mMaxLoc[index].y + mTemplMat.rows()), new Scalar(255,255,255));
-       
-        // Convert final mat image to bitmap
-        mResultBmp = Bitmap.createBitmap(mImgMat.cols(), mImgMat.rows(), Bitmap.Config.ARGB_8888);
-        Utils.matToBitmap(mImgMat, mResultBmp);
-            
-        // Close camera view
-        mOpenCvCameraView.setVisibility(SurfaceView.GONE);
-        
-        // Display bmp in image view
-        mBinaryImageView = (ImageView) findViewById(R.id.binary_image);
-        mBinaryImageView.setImageBitmap(mResultBmp);
-        
-        CharSequence text;
-        if(index == 0)
-            text = "Common Scab disease detected";
-        else if(index == 1)
-            text = "Black Scurf disease detected";
-        else
-            text = "Silver Scurf disease detected";
-        Toast toast = Toast.makeText(getApplicationContext(), text, Toast.LENGTH_LONG);
-        toast.show();
+	}
+	// Load/run healthy test images against templates
+	diseaseName = "potato_healthy_";
+	mImageNameTag = "H";
+	imgNum = 1;
+	while (imgNum < 18) {
+	    int idName = c.getResources().getIdentifier((diseaseName + imgNum),
+		    "drawable", c.getPackageName());
+	    mImgBmp = BitmapFactory.decodeResource(getResources(), idName);
+	    Log.d("imageAcquisition", diseaseName + Integer.toString(imgNum));
+	    setupMatObjectsImg();
+	    // convertToGrayscaleImg();
+	    getTemplates();
+	    determinePossibleDisease();
+	    x = 0;
+	    imgNum += 1;
+	}
+
+	// Load/run silver scurf test images against templates
+	diseaseName = "potato_silverscurf_";
+	mImageNameTag = "SS";
+	imgNum = 1;
+	while (imgNum < 18) {
+	    int idName = c.getResources().getIdentifier((diseaseName + imgNum),
+		    "drawable", c.getPackageName());
+	    mImgBmp = BitmapFactory.decodeResource(getResources(), idName);
+	    Log.d("imageAcquisition", diseaseName + Integer.toString(imgNum));
+	    setupMatObjectsImg();
+	    getTemplates();
+	    determinePossibleDisease();
+	    x = 0;
+	    imgNum += 1;
+	}
     }
-    
-    int determinePossibleDisease() {
-	int maxIndexSoFar = 0;
-	for(int i = 1; i < 3; i++) {
-	    if(mMaxValues[maxIndexSoFar] < mMaxValues[i]) {
-		maxIndexSoFar = i;
+
+    public void convertToGrayscaleImg() {
+	mImgMatGray = new Mat();
+	Imgproc.cvtColor(mImgMatSat, mImgMatGray, Imgproc.COLOR_BGR2GRAY);
+	Log.d("convertToGrayscaleImg", "Clear");
+    }
+
+    public void convertToGrayscaleTempl() {
+	mTemplMatGray = new Mat();
+	Imgproc.cvtColor(mTemplMatSat, mTemplMatGray, Imgproc.COLOR_BGR2GRAY);
+	Log.d("convertToGrayscaleTempl", "Clear");
+    }
+
+    public void displayResult(int index) {
+	/*
+	 * // Draw a rectangle around the match Imgproc.rectangle(mImgMat,
+	 * mMaxLoc[index], new Point(mMaxLoc[index].x + mTemplMat.cols(),
+	 * mMaxLoc[index].y + mTemplMat.rows()), new Scalar(255,255,255));
+	 */
+
+	// Convert final mat image to bitmap
+	mResultBmp = Bitmap.createBitmap(mImgMat.cols(), mImgMat.rows(),
+		Bitmap.Config.ARGB_8888);
+	Utils.matToBitmap(mImgMat, mResultBmp);
+
+	// Close camera view
+	mOpenCvCameraView.setVisibility(SurfaceView.GONE);
+
+	// Display bmp in image view
+	mBinaryImageView = (ImageView) findViewById(R.id.image_view);
+	mBinaryImageView.setImageBitmap(mResultBmp);
+
+	CharSequence text = null;
+	if (index >= 0 || index <= 2) { // Indicates highest value was found to
+					// be black scurf
+	    text = "Disease detected: black scurf";
+	} else if (index >= 3 || index <= 5) { // Indicates highest value was
+					       // found to be common scab
+	    text = "Disease detected: common scab";
+	} else if (index >= 6 || index <= 9) { // Indicates highest value was
+					       // found to be silver scurf
+	    text = "Disease detected: silver scurf";
+	}
+	Toast toast = Toast.makeText(getApplicationContext(), text,
+		Toast.LENGTH_LONG);
+	toast.show();
+    }
+
+    public void determinePossibleDisease() {
+	double maxSoFar = mMaxValues[0];
+	for (int i = 1; i < 8; i++) {
+	    if (mMaxValues[i] > maxSoFar) {
+		maxSoFar = mMaxValues[i];
 	    }
 	}
-	return maxIndexSoFar;
+	Log.d("MAX VALUE", Double.toString(maxSoFar));
+	int maxIndex = 0;
+	for (int j = 0; j < 8; j++) {
+	    if (mMaxValues[j] == maxSoFar)
+		maxIndex = j;
+	}
+
+	if (maxIndex >= 0 && maxIndex <= 2) {
+	    Log.d("DISEASE DETECTED", mImageNameTag + " Index " + maxIndex
+		    + " Black scurf");
+	} else if (maxIndex >= 3 && maxIndex <= 5) {
+	    Log.d("DISEASE DETECTED", mImageNameTag + " Index " + maxIndex
+		    + " Common scab");
+	} else if (maxIndex == 7) {
+	    Log.d("DISEASE DETECTED", mImageNameTag + " Index " + maxIndex
+		    + " Silver scurf");
+	} else {
+	    Log.d("DISEASE DETECTED", mImageNameTag + " Healthy");
+	}
     }
-    
-    void run() {
+
+    public void getTemplates() {
+	Log.d("getTemplates", "Start");
 	Context c = getApplicationContext();
-	
+
 	// Loop through templates
 	// Run through black scurf templates
 	String templName = "potato_blackscurf_templ_";
+	mTemplNameTag = templName;
 	int imgNum = 1;
-	while(imgNum < 4) {
-	    int idName = c.getResources().getIdentifier((templName + imgNum), "drawable", c.getPackageName());
+	
+	while (imgNum < 4) {
+	    mTemplNumTag = imgNum;
+	    int idName = c.getResources().getIdentifier((templName + imgNum),
+		    "drawable", c.getPackageName());
 	    mTemplBmp = BitmapFactory.decodeResource(getResources(), idName);
-	    imageAcquisition();
+	    Log.d("getTemplates", templName + Integer.toString(imgNum));
+	    setupMatObjectsTempl();
+	    templateMatching(mImgMat, mTemplMat);
+	    imgNum++;
 	}
+
 	// Run through common scab templates
 	templName = "potato_commonscab_templ_";
+	mTemplNameTag = templName;
 	imgNum = 1;
-	while(imgNum < 4) {
-	    int idName = c.getResources().getIdentifier((templName + imgNum), "drawable", c.getPackageName());
+	while (imgNum < 4) {
+	    mTemplNumTag = imgNum;
+	    int idName = c.getResources().getIdentifier((templName + imgNum),
+		    "drawable", c.getPackageName());
 	    mTemplBmp = BitmapFactory.decodeResource(getResources(), idName);
-	    imageAcquisition();
-	}
-	// Run through silver scurf templates
-	templName = "potato_silverscurf_templ_";
-	imgNum = 1;
-	while(imgNum < 4) {
-	    int idName = c.getResources().getIdentifier((templName + imgNum), "drawable", c.getPackageName());
-	    mTemplBmp = BitmapFactory.decodeResource(getResources(), idName);
-	    imageAcquisition();
+	    Log.d("getTemplates", templName + Integer.toString(imgNum));
+	    setupMatObjectsTempl();
+	    templateMatching(mImgMat, mTemplMat);
+	    imgNum++;
 	}
 	
-        int index = determinePossibleDisease(); 
-        /*
-        if(index == 0) {
-            cs_templ = getResources().openRawResource(R.drawable.potato_commonscab_templ_1);
-	    mTemplBmp = BitmapFactory.decodeStream(cs_templ);
-	    Utils.bitmapToMat(mTemplBmp, mTemplMat);
-        }
-        else if(index == 1) {
-	    bs_templ = getResources().openRawResource(R.drawable.potato_blackscurf_templ_1);
-	    mTemplBmp = BitmapFactory.decodeStream(bs_templ);
-	    Utils.bitmapToMat(mTemplBmp, mTemplMat);
-        }
-        else {
-	    bs_templ = getResources().openRawResource(R.drawable.potato_silverscurf_templ_1);
-	    mTemplBmp = BitmapFactory.decodeStream(bs_templ);
-	    Utils.bitmapToMat(mTemplBmp, mTemplMat);
-        }
-        
-        displayResult(index);
-        */
+	// Run through healthy template
+	templName = "potato_healthy_";
+	mTemplNameTag = templName;
+	imgNum = 1;
+	mTemplNumTag = imgNum;
+	
+	extractSaturationChannelImg();
+	
+	int idName = c.getResources().getIdentifier((templName + imgNum),
+		"drawable", c.getPackageName());
+	mTemplBmp = BitmapFactory.decodeResource(getResources(), idName);
+	Log.d("getTemplates", templName + Integer.toString(imgNum));
+	setupMatObjectsTempl();
+	extractSaturationChannelTempl();
+	templateMatching(mImgMatSat, mTemplMatSat);
+
+	// Run through silver scurf templates
+	templName = "potato_silverscurf_templ_";
+	mTemplNameTag = templName;
+	imgNum = 1;
+	
+	//extractSaturationChannelImg();
+	
+	while (imgNum < 2) {
+	    mTemplNumTag = imgNum;
+	    idName = c.getResources().getIdentifier((templName + imgNum),
+		    "drawable", c.getPackageName());
+	    mTemplBmp = BitmapFactory.decodeResource(getResources(), idName);
+	    Log.d("getTemplates", templName + Integer.toString(imgNum));
+	    setupMatObjectsTempl();
+	    extractSaturationChannelTempl();
+	    templateMatching(mImgMatSat, mTemplMatSat);
+	    imgNum++;
+	}
+
+	/*
+	 * FOR TESTING PURPOSES, NO NEED TO DISPLAY int index =
+	 * determinePossibleDisease(); displayResult(index);
+	 */
+    }
+
+    public void setupMatObjectsImg() {
+	// Create new mat object for image
+	mImgMat = new Mat();
+	Log.d("setupMatObjectsImg", "Created mat object for test");
+
+	// Convert bitmap test image to OpenCV mat
+	Utils.bitmapToMat(mImgBmp, mImgMat);
+	Log.d("setupMatObjectsImg", "Converted test bitmap to OpenCV mat");
+
+    }
+
+    public void setupMatObjectsTempl() {
+	// Create new mat object for template
+	mTemplMat = new Mat();
+	Log.d("setupMatObjectsTempl", "Created mat object for template");
+
+	// Create new mat object for results matrix
+	int resultCols = mImgMat.cols() - mTemplMat.cols() + 1;
+	int resultRows = mImgMat.rows() - mTemplMat.rows() + 1;
+	mResultMat = new Mat(resultRows, resultCols, CvType.CV_32FC1);
+
+	// Convert bitmap template to OpenCV mat
+	Utils.bitmapToMat(mTemplBmp, mTemplMat);
+	Log.d("setupMatObjectsTempl", "Converted template bitmap to OpenCV mat");
+
     }
 
 }
